@@ -22,6 +22,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		u += "?" + r.URL.RawQuery
 	}
 	u = strings.Replace(u, ":/", "://", 1)
+	u = strings.Replace(u, ":///", "://", 1)
+
+	if !strings.HasPrefix(u, "http") {
+		http.Error(w, "invalid url: "+u, http.StatusBadRequest)
+		return
+	}
 
 	req, err := http.NewRequest(r.Method, u, r.Body)
 	if err != nil {
