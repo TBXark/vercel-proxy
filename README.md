@@ -13,6 +13,5 @@ fetch("https://project-name.vercel.app/https://example.com?param1=value1&param2=
 ```
 
 ```bash
-curl https://project-name.vercel.app/https:/example.com?param1=value1&param2=value2
+curl -L https://project-name.vercel.app/https:/example.com?param1=value1&param2=value2
 ```
-> 注意 `curl` 这里需要把 `https://` 换成 `https:/`，否则会报错。
