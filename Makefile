@@ -1,0 +1,3 @@
+.PHONY:
+deploy:
+	vercel --prod
