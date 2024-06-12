@@ -3,6 +3,7 @@ package handler
 import (
 	"io"
 	"net/http"
+	"strings"
 )
 
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -16,29 +17,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	loadProxyParams := func(r *http.Request, key string) string {
-		value := r.Header.Get(key)
-		if value == "" {
-			value = r.URL.Query().Get(key)
-			r.URL.Query().Del(key)
-		}
-		r.Header.Del(key)
-		return value
+	u := strings.TrimLeft(r.URL.Path, "/")
+	if r.URL.RawQuery != "" {
+		u += "?" + r.URL.RawQuery
 	}
+	u = strings.Replace(u, ":/", "://", 1)
 
-	hostname := loadProxyParams(r, "X-PROXY-HOST")
-	proxyScheme := loadProxyParams(r, "X-PROXY-SCHEME")
-	if hostname == "" {
-		http.Error(w, "X-PROXY-HOST is required", http.StatusBadRequest)
-		return
-	}
-	if proxyScheme == "" {
-		proxyScheme = "https"
-	}
-	r.URL.Host = hostname
-	r.URL.Scheme = proxyScheme
-
-	req, err := http.NewRequest(r.Method, r.URL.String(), r.Body)
+	req, err := http.NewRequest(r.Method, u, r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
