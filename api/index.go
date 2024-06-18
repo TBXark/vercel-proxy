@@ -1,8 +1,9 @@
-package handler
+package api
 
 import (
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 )
 
@@ -17,12 +18,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u := strings.TrimLeft(r.URL.Path, "/")
+	re := regexp.MustCompile(`^/?(https?:)/+`)
+	u := re.ReplaceAllString(r.URL.Path, "$1//")
 	if r.URL.RawQuery != "" {
 		u += "?" + r.URL.RawQuery
 	}
-	u = strings.Replace(u, ":/", "://", 1)
-	u = strings.Replace(u, ":///", "://", 1)
 
 	if !strings.HasPrefix(u, "http") {
 		http.Error(w, "invalid url: "+u, http.StatusBadRequest)
