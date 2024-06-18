@@ -18,7 +18,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	re := regexp.MustCompile(`^/?(https?:)/+`)
+	re := regexp.MustCompile(`^/{0,}(https?:)/{0,}`)
 	u := re.ReplaceAllString(r.URL.Path, "$1//")
 	if r.URL.RawQuery != "" {
 		u += "?" + r.URL.RawQuery
