@@ -51,6 +51,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			w.Header().Add(k, vv)
 		}
 	}
+	w.Header().Del("Referer")
+	// 将Referer的值替换为请求的Host
+	w.Header().Add("Referer", r.Host)
+	// w.Header().Add("X-Requested-Host", r.Host)
 	w.WriteHeader(resp.StatusCode)
 	_, err = io.Copy(w, resp.Body)
 }
