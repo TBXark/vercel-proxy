@@ -18,6 +18,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if r.URL.Path == "/" {
+		http.Redirect(w, r, "https://github.com/TBXark/vercel-proxy", http.StatusMovedPermanently)
+	}
+
 	re := regexp.MustCompile(`^/{0,}(https?:)/{0,}`)
 	u := re.ReplaceAllString(r.URL.Path, "$1//")
 	if r.URL.RawQuery != "" {
