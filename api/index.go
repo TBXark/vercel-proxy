@@ -20,6 +20,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	if r.URL.Path == "/" {
 		http.Redirect(w, r, "https://github.com/TBXark/vercel-proxy", http.StatusMovedPermanently)
+		return
 	}
 
 	re := regexp.MustCompile(`^/{0,}(https?:)/{0,}`)
