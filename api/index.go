@@ -70,6 +70,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			req.Header.Add(k, vv)
 		}
 	}
+	if r.Header.Get("Accept-Encoding") != "" {
+		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			req.Header.Set("Accept-Encoding", "gzip")
+		}
+	}
 
 	// Send the request to the real server
 	resp, err := http.DefaultClient.Do(req)
@@ -83,7 +88,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	// If the content type is HTML, replace the base URL
 	if strings.Contains(resp.Header.Get("Content-Type"), "text/html") {
-		if e := proxyHTML(w, resp, req.URL.Host); e != nil {
+		if e := proxyHTML(w, resp, req, req.URL.Host); e != nil {
 			internalServerError(w, e)
 			return
 		}
@@ -117,16 +122,20 @@ func proxyRaw(w http.ResponseWriter, resp *http.Response, req *http.Request) err
 	return nil
 }
 
-func proxyHTML(w http.ResponseWriter, resp *http.Response, baseURL string) error {
+func proxyHTML(w http.ResponseWriter, resp *http.Response, req *http.Request, baseURL string) error {
 
+	var err error
 	var reader io.ReadCloser = resp.Body
-	if strings.Contains(resp.Header.Get("Content-Encoding"), "gzip") {
-		var err error
+
+	encoding := resp.Header.Get("Content-Encoding")
+	if strings.Contains(encoding, "gzip") {
 		reader, err = gzip.NewReader(resp.Body)
 		if err != nil {
 			return err
 		}
 		defer reader.Close()
+	} else {
+		return proxyRaw(w, resp, req)
 	}
 
 	doc, err := html.Parse(reader)
@@ -139,7 +148,6 @@ func proxyHTML(w http.ResponseWriter, resp *http.Response, baseURL string) error
 			for i, a := range n.Attr {
 				if a.Key == "src" || a.Key == "href" {
 					if !strings.HasPrefix(a.Val, "http") && (strings.HasPrefix(a.Val, "/") || strings.HasPrefix(a.Val, "./")) {
-						log.Printf("Replace\n%s\n%s\n\n", a.Val, "./"+path.Join(baseURL, a.Val))
 						n.Attr[i].Val = "./" + path.Join(baseURL, a.Val)
 					}
 				}
