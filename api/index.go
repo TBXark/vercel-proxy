@@ -1,12 +1,18 @@
 package api
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"path"
 	"regexp"
+	"strconv"
 	"strings"
+
+	"golang.org/x/net/html"
 )
 
 func internalServerError(w http.ResponseWriter, err error) {
@@ -75,7 +81,24 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		internalServerError(writer, response.Body.Close())
 	}(w, resp)
 
-	// Copy the response headers to the output stream
+	// If the content type is HTML, replace the base URL
+	if strings.Contains(resp.Header.Get("Content-Type"), "text/html") {
+		if e := proxyHTML(w, resp, req.URL.Host); e != nil {
+			internalServerError(w, e)
+			return
+		}
+	} else {
+		// Otherwise, just copy the response body
+		if e := proxyRaw(w, resp, r); e != nil {
+			internalServerError(w, e)
+			return
+		}
+	}
+
+	w.WriteHeader(resp.StatusCode)
+}
+
+func proxyRaw(w http.ResponseWriter, resp *http.Response, req *http.Request) error {
 	for k, v := range resp.Header {
 		for _, vv := range v {
 			w.Header().Add(k, vv)
@@ -83,14 +106,62 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	if w.Header().Get("Referer") != "" {
 		w.Header().Del("Referer")
-		w.Header().Add("Referer", r.Host)
+		w.Header().Add("Referer", req.Host)
 	}
 
 	// Copy the response body to the output stream
-	_, err = io.Copy(w, resp.Body)
+	_, err := io.Copy(w, resp.Body)
 	if err != nil {
-		internalServerError(w, err)
-		return
+		return err
 	}
-	w.WriteHeader(resp.StatusCode)
+	return nil
+}
+
+func proxyHTML(w http.ResponseWriter, resp *http.Response, baseURL string) error {
+
+	var reader io.ReadCloser = resp.Body
+	if strings.Contains(resp.Header.Get("Content-Encoding"), "gzip") {
+		var err error
+		reader, err = gzip.NewReader(resp.Body)
+		if err != nil {
+			return err
+		}
+		defer reader.Close()
+	}
+
+	doc, err := html.Parse(reader)
+	if err != nil {
+		return err
+	}
+	var f func(*html.Node)
+	f = func(n *html.Node) {
+		if n.Type == html.ElementNode {
+			for i, a := range n.Attr {
+				if a.Key == "src" || a.Key == "href" {
+					if !strings.HasPrefix(a.Val, "http") && (strings.HasPrefix(a.Val, "/") || strings.HasPrefix(a.Val, "./")) {
+						log.Printf("Replace\n%s\n%s\n\n", a.Val, "./"+path.Join(baseURL, a.Val))
+						n.Attr[i].Val = "./" + path.Join(baseURL, a.Val)
+					}
+				}
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			f(c)
+		}
+	}
+	f(doc)
+
+	var buf bytes.Buffer
+	err = html.Render(&buf, doc)
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(w, &buf)
+	if err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Content-Length", strconv.Itoa(int(buf.Len())))
+	return nil
 }
