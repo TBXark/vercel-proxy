@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"path"
 	"regexp"
 	"strconv"
@@ -30,6 +31,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, fmt.Sprintf("internal server error: %v", err), http.StatusInternalServerError)
 		}
 	}()
+
+	htmlProxy := os.Getenv("HTTP_PROXY_ENABLE") == "true"
 
 	// Set the CORS headers
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -70,7 +73,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			req.Header.Add(k, vv)
 		}
 	}
-	if r.Header.Get("Accept-Encoding") != "" {
+	if htmlProxy && r.Header.Get("Accept-Encoding") != "" {
 		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 			req.Header.Set("Accept-Encoding", "gzip")
 		}
@@ -87,7 +90,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}(w, resp)
 
 	// If the content type is HTML, replace the base URL
-	if strings.Contains(resp.Header.Get("Content-Type"), "text/html") {
+	if strings.Contains(resp.Header.Get("Content-Type"), "text/html") && htmlProxy {
 		if e := proxyHTML(w, resp, req, req.URL.Host); e != nil {
 			internalServerError(w, e)
 			return
