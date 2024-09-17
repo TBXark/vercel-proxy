@@ -1,9 +1,10 @@
 package main
 
 import (
-	"github.com/tbxark/vercel-proxy/api"
 	"log"
 	"net/http"
+
+	"github.com/tbxark/vercel-proxy/api"
 )
 
 func main() {
